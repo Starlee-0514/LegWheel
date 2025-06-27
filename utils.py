@@ -69,3 +69,64 @@ def create_command_csv(theta_command, beta_command, file_name, transform=True): 
 
     # 將 DataFrame 寫入 Excel 檔案
     df.to_csv(file_name + '.csv', index=False, header=False)
+    
+    
+def parabolic_blends(p, t, tp=0.2, vi=0, vf=0): # position, time: 0~1, acceleration time, initial velocity, final velocity
+    p = np.array(p).astype(float)
+    t = np.array(t)
+    n_points = p.shape[0]
+    p0 = p[0]
+    if vi is None:
+        vi = (p[1]-p[0]) / (t[1]-t[0])
+    else:
+        t[0] += 0.5 * tp # t0 = tp/2
+        p[0] = p[0] + vi * tp/2
+    if vf is None:
+        vf = (p[-1]-p[-2]) / (t[-1]-t[-2])
+    else:
+        t[-1] -= 0.5 * tp
+        p[-1] = p[-1] - vf * tp/2
+    parabolic_arr = np.zeros((2*n_points-1, 3))
+    v = np.hstack((vi, np.diff(p)/np.diff(t), vf)) 
+    a = np.diff(v)/tp
+
+    # a0 = ((p[1]-v[0]*tp[0]-p[0])/(t[1]-tp[0]) - v[0]) / ( 2*tp[0] + (tp[0])**2/(t[1]-tp[0]) )   # p0(t) = a t^2 + v0 t + p0
+    # p[0] = np.polyval(np.array([a0, v[0], p[0]]), tp[0])    # p0(tp/2)
+    # t[0] = tp[0]    # t0 = tp/2
+    # v = np.hstack((vi, np.diff(p)/np.diff(t), vf)) 
+    # a = np.diff(v)/tp
+    parabolic_arr[0] = np.array([0.5*a[0], v[0], p0]) # 1st segment, 0~tp, acceleration
+    for i in range(n_points-1): 
+        if i==0:
+            parabolic_arr[2*i+1] = v[i+1]*np.array([0, 1, -t[i]]) + np.array([0, 0, p[i]])  # constant speed   
+        else:
+            parabolic_arr[2*i+1] = v[i+1]*np.array([0, 1, -t[i]]) + np.array([0, 0, p[i]])  # constant speed   
+        tmp = t[i+1] - 0.5*tp # acceleration start time
+        parabolic_arr[2*i+2] = parabolic_arr[2*i+1] + 0.5*a[i+1]*np.array([1, -2*tmp, tmp**2])  # acceleration
+
+    return parabolic_arr
+
+
+def get_parabolic_point(p, parabolic_arr, t, tp=0.1):
+    t = np.array(t)
+    n_points = t.shape[0]
+    t[0] += 0.5 * tp
+    t[-1] -= 0.5 * tp
+    
+    segments = np.zeros(parabolic_arr.shape[0])
+    segments[0] = t[0] + 0.5 * tp
+    for i in range(n_points-1): 
+        segments[2*i+1] = t[i+1] - 0.5 * tp
+        segments[2*i+2] = t[i+1] + 0.5 * tp
+    
+    if p < 0: 
+        return np.polyval(parabolic_arr[0], p/p) 
+    elif p >= 1.0:
+        return np.polyval(parabolic_arr[-1], p/p) 
+    else:
+        for idx, segment in enumerate(segments):
+            if p < segment:
+                return np.polyval(parabolic_arr[idx], p) 
+
+    print("ERROR IN get_parabolic_point")
+    return 0
