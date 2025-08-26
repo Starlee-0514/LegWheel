@@ -23,8 +23,9 @@ class PlotLeg(LegModel.LegModel):
             self.R = leg_model.R
             self.r = leg_model.r
             self.radius = leg_model.radius
+            self.foot_offset = leg_model.foot_offset
             # Plot setting 
-            self.fig_size = 10
+            self.fig_size = 15
             self.mark_size = 2.0
             self.line_width = 1.0
             self.zorder = 1.0
@@ -45,19 +46,24 @@ class PlotLeg(LegModel.LegModel):
             self.upper_rim_l = self.rim( *self.get_arc(self.leg_model.H_l, self.leg_model.F_l, self.leg_model.U_l, self.r))
             self.lower_rim_r = self.rim( *self.get_arc(self.leg_model.G,   self.leg_model.F_r, self.leg_model.L_r, self.r))
             self.lower_rim_l = self.rim( *self.get_arc(self.leg_model.F_l, self.leg_model.G,   self.leg_model.L_l, self.r))
+            self.foot_rim    = self.rim( *self.get_arc(self.leg_model.I_l, self.leg_model.I_r, self.leg_model.O_r, 0.01225))
             # five joints on the rims   (center, radius)
             self.upper_joint_r = self.get_circle(self.leg_model.H_r, self.r) 
             self.upper_joint_l = self.get_circle(self.leg_model.H_l, self.r) 
             self.lower_joint_r = self.get_circle(self.leg_model.F_r, self.r) 
             self.lower_joint_l = self.get_circle(self.leg_model.F_l, self.r) 
             self.G_joint       = self.get_circle(self.leg_model.G,   self.r)
+            self.foot_joint       = self.get_circle(self.leg_model.G,  0.0345)
+            self.I_joint_l       = self.get_circle(self.leg_model.I_l, 0.01225)
+            self.I_joint_r       = self.get_circle(self.leg_model.I_r, 0.01225)
             # six bars  (point1, point2)
             self.OB_bar_r = self.get_line(0, self.leg_model.B_r) 
             self.OB_bar_l = self.get_line(0, self.leg_model.B_l) 
             self.AE_bar_r = self.get_line(self.leg_model.A_r, self.leg_model.E)
             self.AE_bar_l = self.get_line(self.leg_model.A_l, self.leg_model.E)
             self.CD_bar_r = self.get_line(self.leg_model.C_r, self.leg_model.D_r)
-            self.CD_bar_l = self.get_line(self.leg_model.C_l, self.leg_model.D_l) 
+            self.CD_bar_l = self.get_line(self.leg_model.C_l, self.leg_model.D_l)
+            # self.I_bar    = self.get_line(self.leg_model.I_l, self.leg_model.I_r)
             
         def get_arc(self, p1, p2, o, offset=0.01):
             start = np.angle(p1-o, deg=True)
