@@ -25,8 +25,9 @@ class LegModel:
             self.r = 0.019  # with tire: 19 mm
         self.radius = self.R + self.r
         # new foot design parameters
-        self.foot_offset = 0.02225 # rim offset for new foot 22.25 mm
-        
+        self.foot_offset = 0.02225  # rim offset for new foot 22.25 mm
+        self.tyre_thickness = 0.01225  # tire thickness 12.25 mm
+
         # linkage parameters
         self.arc_HF = np.deg2rad(130)   # arc HF
         self.arc_BC = np.deg2rad(101)   # arc BC
@@ -99,11 +100,16 @@ class LegModel:
             self.F_l = self.C_l + (self.B_l - self.C_l) * np.exp( -1j*(self.ang_BCF) ) * (self.l7 / self.l3) # OF = OC + CF
             self.ang_OGF = np.arcsin(abs(self.F_l.imag) / self.l8)
             self.G = self.F_l.real - self.l8 * np.cos(self.ang_OGF) # OG = OF - GF
-            self.O_r = self.G.real + self.R  # rim center
-            self.I_l = self.O_r + (self.R + self.foot_offset) * np.exp( 1j*(np.deg2rad(180-40)) )
             self.U_l = self.B_l + (self.C_l - self.B_l) * np.exp( 1j*(self.ang_UBC) ) * (self.R / self.l3)   # OOU = OB + BOU
             self.L_l = self.F_l + (self.G - self.F_l) * np.exp( 1j*(self.ang_LFG) ) * (self.R / self.l8)   # OOL = OF + FOL
             self.H_l = self.U_l + (self.B_l - self.U_l) * np.exp( -1j*(self.theta0) )  # OH = OOU + OUH
+            # foot characteristics points
+            self.O_r = self.G.real + self.R  # rim center
+            self.I_l = self.O_r + (self.R + self.foot_offset) * np.exp( 1j*(np.deg2rad(180-40)) )
+            self.ang_OC = np.angle(self.C_l)
+            self.J_l = self.U_l + (self.R + self.foot_offset) * np.exp( 1j*(np.deg2rad(135)+np.angle(self.H_l - self.U_l)))
+            self.H_extend_l = self.U_l + (self.R + self.foot_offset) * np.exp( 1j*(np.angle(self.H_l - self.U_l)))
+
         else:
             # Using coefficient
             self.A_l = A_l_poly[1](self.theta) - 1j * A_l_poly[0](self.theta)
@@ -143,6 +149,10 @@ class LegModel:
         self.O_r = rot_ang * self.O_r
         self.I_l = rot_ang * self.I_l
         self.I_r = rot_ang * self.I_r
+        self.J_l = rot_ang * self.J_l
+        self.J_r = rot_ang * self.J_r
+        self.H_extend_l = rot_ang * self.H_extend_l
+        self.H_extend_r = rot_ang * self.H_extend_r
 
     # Get right side joints before rotate beta
     def symmetry(self):
@@ -155,7 +165,9 @@ class LegModel:
         self.U_r = np.conjugate(self.U_l)
         self.L_r = np.conjugate(self.L_l)
         self.I_r = np.conjugate(self.I_l)
-    
+        self.J_r = np.conjugate(self.J_l)
+        self.H_extend_r = np.conjugate(self.H_extend_l)
+
     # Convert position expressions from complex numbers to vectors
     def to_vector(self):
         if self.n_elements == 0:
@@ -177,8 +189,11 @@ class LegModel:
             self.U_r = np.array([self.U_r.real, self.U_r.imag])
             self.L_l = np.array([self.L_l.real, self.L_l.imag])
             self.L_r = np.array([self.L_r.real, self.L_r.imag])
+            self.O_r = np.array([self.O_r.real, self.O_r.imag])
             self.I_l = np.array([self.I_l.real, self.I_l.imag])
             self.I_r = np.array([self.I_r.real, self.I_r.imag])
+            self.J_l = np.array([self.J_l.real, self.J_l.imag])
+            self.J_r = np.array([self.J_r.real, self.J_r.imag])
         else:
             self.A_l = np.array([self.A_l.real, self.A_l.imag]).transpose(1, 0)
             self.A_r = np.array([self.A_r.real, self.A_r.imag]).transpose(1, 0)
@@ -200,7 +215,9 @@ class LegModel:
             self.L_r = np.array([self.L_r.real, self.L_r.imag]).transpose(1, 0)
             self.I_l = np.array([self.I_l.real, self.I_l.imag]).transpose(1, 0)
             self.I_r = np.array([self.I_r.real, self.I_r.imag]).transpose(1, 0)
-
+            self.O_r = np.array([self.O_r.real, self.O_r.imag]).transpose(1, 0)
+            self.J_l = np.array([self.J_l.real, self.J_l.imag]).transpose(1, 0)
+            self.J_r = np.array([self.J_r.real, self.J_r.imag]).transpose(1, 0)
 
     #### Contact map ####
     # Not consider the situation where there is no normal contact.
@@ -438,7 +455,80 @@ class LegModel:
         
         return guessed_hip - move_vec
 
+    def rot(self, ang):
+        """returns the rotation matrix for a given angle.
 
+        Args:
+            ang (float): The angle (in radians) to rotate.
+
+        Returns:
+            np.ndarray: The 2D rotation matrix.
+        """
+        rot_matrix = np.array([[np.cos(ang), -np.sin(ang)],
+                                [np.sin(ang),  np.cos(ang)]])
+        return rot_matrix
+
+    # Calculate rim point position
+    def rim_point(self, alpha = 0.0):
+        """
+        Calculate the rim point position for a given alpha angle.\n
+        note: its for the leg designed by starlee, not for the origin one
+        ## Rim point position definition
+        foot: [-40,+40] deg\n
+        Upper rim RHS: (40, 180] deg \n
+        Upper rim LHS: [-180, -40) deg
+        Args:
+            alpha (float): The alpha angle (degree) for which to calculate the rim point.
+        Returns:
+            return: The position of the rim point as a complex number.
+        """
+        # calculate in vector forms
+        self.forward(self.theta, self.beta, vector=True)
+
+        # check if alpha in range and turn it into the range [-180, 180]
+        if alpha < -180 or alpha > 180:
+            alpha = ((alpha + 180) % 360) - 180
+        if self.n_elements == 0:
+            if -40 <= alpha <= 40:
+                # Foot rim
+                # P(alpha) = O_r + (R+foot_offset)*rot(alpha)*norm(O_r -> G)
+                rim_point = self.O_r + (self.R+self.foot_offset+self.tyre_thickness)*(self.rot(np.deg2rad(alpha))@(self.G-self.O_r))/np.linalg.norm(self.G-self.O_r)
+            elif 40 < alpha <= 180:
+                # Upper rim RHS
+                # P(alpha) = U_r + (R+foot_offset)*rot(alpha-40)*norm(U_r -> J_r)
+                rim_point = self.U_r + (self.R+self.foot_offset+self.tyre_thickness)*(self.rot(np.deg2rad(alpha-40))@(self.J_r-self.U_r))/np.linalg.norm(self.J_r-self.U_r)
+            elif -180 <= alpha < -40:
+                # Upper rim LHS
+                # P(alpha) = U_l + (R+foot_offset)*rot(alpha+40)*norm(U_l -> J_l)
+                rim_point = self.U_l + (self.R+self.foot_offset+self.tyre_thickness)*(self.rot(np.deg2rad(alpha+40))@(self.J_l-self.U_l))/np.linalg.norm(self.J_l-self.U_l)
+            else:
+                raise ValueError("Invalid alpha angle.")
+        else:
+            if -40 <= alpha <= 40:
+                # Foot rim
+                # P(alpha) = O_r + (R+foot_offset)*rot(alpha)*norm(O_r -> G)
+                rim_point = self.O_r + (self.R+self.foot_offset+self.tyre_thickness)*   (self.rot(np.deg2rad(alpha))   @(self.G-self.O_r).T    ).T/ np.linalg.norm(self.G-self.O_r)
+            elif 40 < alpha <= 180:
+                # Upper rim RHS
+                # P(alpha) = U_r + (R+foot_offset)*rot(alpha-40)*norm(U_r -> J_r)
+                rim_point = self.U_r + (self.R+self.foot_offset+self.tyre_thickness)*   (self.rot(np.deg2rad(alpha-40))@(self.J_r-self.U_r).T  ).T/ np.linalg.norm(self.J_r-self.U_r)
+            elif -180 <= alpha < -40:
+                # Upper rim LHS
+                # P(alpha) = U_l + (R+foot_offset)*rot(alpha+40)*norm(U_l -> J_l)
+                rim_point = self.U_l + (self.R+self.foot_offset+self.tyre_thickness)*   (self.rot(np.deg2rad(alpha+40))@(self.J_l-self.U_l).T  ).T/ np.linalg.norm(self.J_l-self.U_l)
+            else:
+                raise ValueError("Invalid alpha angle.")
+
+        return rim_point
+
+    def __getitem__(self, key):
+        """
+        Allows access to joint positions using [] operator.
+        Example: legmodel['G'] returns the position of joint G.
+        """
+        if key not in self.__dict__:
+            raise KeyError(f"Joint '{key}' not found.")
+        return self.__dict__[key]
 
 if __name__ == '__main__':
     legmodel = LegModel(sim=True)

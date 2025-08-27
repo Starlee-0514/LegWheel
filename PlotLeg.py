@@ -24,6 +24,7 @@ class PlotLeg(LegModel.LegModel):
             self.r = leg_model.r
             self.radius = leg_model.radius
             self.foot_offset = leg_model.foot_offset
+            self.tyre_thickness = leg_model.tyre_thickness
             # Plot setting 
             self.fig_size = 15
             self.mark_size = 2.0
@@ -46,16 +47,24 @@ class PlotLeg(LegModel.LegModel):
             self.upper_rim_l = self.rim( *self.get_arc(self.leg_model.H_l, self.leg_model.F_l, self.leg_model.U_l, self.r))
             self.lower_rim_r = self.rim( *self.get_arc(self.leg_model.G,   self.leg_model.F_r, self.leg_model.L_r, self.r))
             self.lower_rim_l = self.rim( *self.get_arc(self.leg_model.F_l, self.leg_model.G,   self.leg_model.L_l, self.r))
-            self.foot_rim    = self.rim( *self.get_arc(self.leg_model.I_l, self.leg_model.I_r, self.leg_model.O_r, 0.01225))
+            self.foot_rim    = self.rim( *self.get_arc(self.leg_model.I_l, self.leg_model.I_r, self.leg_model.O_r, self.tyre_thickness))
+            self.upper_rim_r_foot = self.rim( *self.get_arc(self.leg_model.J_r, self.leg_model.H_extend_r, self.leg_model.U_r, self.tyre_thickness))
+            self.lower_rim_l_foot = self.rim( *self.get_arc(self.leg_model.H_extend_l, self.leg_model.J_l, self.leg_model.U_l, self.tyre_thickness))
+
             # five joints on the rims   (center, radius)
             self.upper_joint_r = self.get_circle(self.leg_model.H_r, self.r) 
             self.upper_joint_l = self.get_circle(self.leg_model.H_l, self.r) 
             self.lower_joint_r = self.get_circle(self.leg_model.F_r, self.r) 
             self.lower_joint_l = self.get_circle(self.leg_model.F_l, self.r) 
             self.G_joint       = self.get_circle(self.leg_model.G,   self.r)
-            self.foot_joint       = self.get_circle(self.leg_model.G,  0.0345)
-            self.I_joint_l       = self.get_circle(self.leg_model.I_l, 0.01225)
-            self.I_joint_r       = self.get_circle(self.leg_model.I_r, 0.01225)
+            self.foot_joint       = self.get_circle(self.leg_model.G,  self.foot_offset+self.tyre_thickness)
+            self.I_joint_l       = self.get_circle(self.leg_model.I_l, self.tyre_thickness)
+            self.I_joint_r       = self.get_circle(self.leg_model.I_r, self.tyre_thickness)
+            self.H_extend_joint_l = self.get_circle(self.leg_model.H_extend_l, self.tyre_thickness)
+            self.H_extend_joint_r = self.get_circle(self.leg_model.H_extend_r, self.tyre_thickness)
+            self.J_joint_l        = self.get_circle(self.leg_model.J_l, self.tyre_thickness)
+            self.J_joint_r        = self.get_circle(self.leg_model.J_r, self.tyre_thickness)
+            
             # six bars  (point1, point2)
             self.OB_bar_r = self.get_line(0, self.leg_model.B_r) 
             self.OB_bar_l = self.get_line(0, self.leg_model.B_l) 
@@ -63,8 +72,9 @@ class PlotLeg(LegModel.LegModel):
             self.AE_bar_l = self.get_line(self.leg_model.A_l, self.leg_model.E)
             self.CD_bar_r = self.get_line(self.leg_model.C_r, self.leg_model.D_r)
             self.CD_bar_l = self.get_line(self.leg_model.C_l, self.leg_model.D_l)
-            # self.I_bar    = self.get_line(self.leg_model.I_l, self.leg_model.I_r)
-            
+            # self.Ir_bar_point    = self.get_line(0 , self.leg_model.I_r)
+            # self.Il_bar_point    = self.get_line(0 , self.leg_model.I_l)
+
         def get_arc(self, p1, p2, o, offset=0.01):
             start = np.angle(p1-o, deg=True)
             end = np.angle(p2-o, deg=True)
