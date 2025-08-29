@@ -19,6 +19,24 @@ class Solver:
         self.method_list = ["Newton", "Bisection", "Secant", "Regula Falsi"]
 
     def solve(self, x0, x1=None):
+        """Solve the equation using the specified method.
+
+        Args:
+            x0 (float): The initial guess or lower bound.
+            x1 (float, optional): The upper bound (for methods that require it). Defaults to None.
+
+        Raises:
+            ValueError: If the method is not recognized or if the function is not defined.
+
+        Returns:
+            float: The solution found by the solver.
+
+        Raises:
+            ValueError: If the method is not recognized or if the function is not defined.
+
+        Returns:
+            float: The solution found by the solver.    
+        """
         if self.method == "Newton":
             return self.newton_method(x0)
         elif self.method == "Bisection":
@@ -40,6 +58,7 @@ class Solver:
                 return x1
             x0 = x1
         raise ValueError("Failed to converge.")
+    
     def bisection_method(self, x0, x1=None):
         if x1 is None:
             x1 = x0 + 1
@@ -115,3 +134,14 @@ if __name__ == "__main__":
     )
     root = solver.solve(1.0)
     print("Root found:", root)
+    
+    # example sin(a) = sqrt(2)/2
+    solver = Solver(
+        method="Regula Falsi",
+        tol=1e-6,
+        max_iter=100,
+        function=lambda x: np.sin(x) - np.sqrt(2)/2,
+        derivative=lambda x: np.cos(x)
+    )
+    root = solver.solve(np.pi/3, np.pi/8)
+    print("Root found:", np.rad2deg(root))

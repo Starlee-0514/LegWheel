@@ -2,16 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 from matplotlib.animation import FuncAnimation
-# try:
-#     import LegModel
-#     import PlotLeg
-# except ModuleNotFoundError:
-#     sys.path.append('../')
-#     import LegModel
-#     import PlotLeg
-#     sys.path.append('../')
-#     import LegModel
-#     import PlotLeg
 sys.path.append('C:\\Users\\starl\\NTU\\Birola_LAB\\Code\\LegWheel')
 import LegModel
 import PlotLeg

@@ -27,6 +27,7 @@ class LegModel:
         # new foot design parameters
         self.foot_offset = 0.02225  # rim offset for new foot 22.25 mm
         self.tyre_thickness = 0.01225  # tire thickness 12.25 mm
+        self.foot_radius = self.R + self.foot_offset + self.tyre_thickness  # foot radius 134.5 mm
 
         # linkage parameters
         self.arc_HF = np.deg2rad(130)   # arc HF
