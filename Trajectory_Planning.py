@@ -65,6 +65,42 @@ class TrajectoryPlanner:
         self.generate_swing_trajectory()                                      # Generate swing trajectory
         
         
+    def set_speed(self, speed):
+        """
+        Set the speed of the leg movement.
+
+        Args:
+            speed (float): unit: m/s. The desired speed of the leg movement.
+
+        Raises:
+            KeyError: If the speed is not valid.
+
+        Returns:
+            float: The updated speed of the leg movement.
+
+            KeyError: If the speed is not valid.
+
+        Returns:
+            float: The updated speed of the leg movement.       
+        """
+        if speed <= 0:
+            raise KeyError("Invalid speed. Speed must be positive.")
+        if self.V == 0:
+            raise KeyError("Current speed is zero, cannot scale to new speed.")
+        scale = speed / self.V
+        self.T = self.T / scale
+        self.reinitialize()
+        
+    def reinitialize(self):
+        self.__init__(stand_height=self.stand_height,
+                      step_length=self.step_length,
+                      leg=self.leg,
+                      step_height=self.step_height,
+                      period=self.T,
+                      dt=self.dt,
+                      duty=self.duty,
+                      overlap=self.overlap)
+
     # ====================< function to joint angles >===================
     # function to transfer stand height and step length to joint angles
     # ===================================================================
@@ -149,6 +185,7 @@ class TrajectoryPlanner:
 
     def move(self):
         self.cmd = []  # command list [theta, beta]
+        
         # rolling phase planning
         for t in np.arange(0, self.T * (1 - self.duty*(1-self.overlap)), self.dt):
             if t < self.T/4*3:
@@ -168,14 +205,18 @@ class TrajectoryPlanner:
         self.G_lo = self.leg["G"].copy()
         self.leg.forward(theta=self.cmd[-2][0], beta=self.cmd[-2][1])
         self.G_lo_prev = self.leg["G"].copy()
-        self.v_lo = self.L/(self.T) * (self.G_lo_prev - self.G_lo) / np.linalg.norm(self.G_lo_prev - self.G_lo)
+        # self.v_lo = self.L/(self.T) * (self.G_lo_prev - self.G_lo) / np.linalg.norm(self.G_lo_prev - self.G_lo)
+        # self.v_lo = -self.V * (self.G_lo_prev - self.G_lo) / np.linalg.norm(self.G_lo_prev - self.G_lo)
+        self.v_lo = np.array([0, self.V])
         
         # touch down velocity setting
         self.leg.forward(theta=self.cmd[0][0], beta=self.cmd[0][1])
         self.G_td = self.leg["G"].copy()
         self.leg.forward(theta=self.cmd[1][0], beta=self.cmd[1][1])
         self.G_td_prev = self.leg["G"].copy()
-        self.v_td = self.L/(self.T) * (self.G_td_prev - self.G_td) / np.linalg.norm(self.G_td_prev - self.G_td)
+        # self.v_td = self.L/(self.T) * (self.G_td_prev - self.G_td) / np.linalg.norm(self.G_td_prev - self.G_td)
+        # self.v_td = self.V * (self.G_td_prev - self.G_td) / np.linalg.norm(self.G_td_prev - self.G_td)
+        self.v_td = np.array([0,self.V])
 
         self.generate_swing_trajectory()
         # swing phase
@@ -184,13 +225,14 @@ class TrajectoryPlanner:
         # transfer to polar coordinates
         self.swing_points_polar = list(map(self.cartesian_to_polar, self.swing_points)) # transform to polar coordinates then transfer to command space
         ang_offset = np.pi/2        # angle offset for swing trajectory
-
+        
+        # transform to command space
         self.swing_points_cmd = list(map(lambda x: [inv_G_dist_poly(x[0]), x[1] + ang_offset] , self.swing_points_polar))  # transform to command space
-        
-        
+        self.swing_points_cmd = list(map(lambda x: [x[0] if x[0] <= np.deg2rad(160) else np.deg2rad(160), x[1]] ,
+                                         self.swing_points_cmd))  # transform to command space
+
+
         self.cmd += self.swing_points_cmd
-        # debug
-        print(f"Swing vs stance = {len(self.swing_points_cmd)/len(self.cmd)}")
 
     # index operator
     def __getitem__(self, key):
@@ -212,7 +254,6 @@ if __name__ == "__main__":
     import time
     if animate:
         from matplotlib.animation import FuncAnimation
-        from tqdm import tqdm
     
     # ====================< initialization >===================
     # Initialize parameters for leg model
@@ -285,11 +326,7 @@ if __name__ == "__main__":
                                         "_Step_Height"+str(traj_planner.step_height),
                                         "_Period"+str(traj_planner.T ),
                                         "_Velocity"+str(round(traj_planner.V, 2))])
-            for _ in tqdm(range(len(traj_planner.cmd)), desc="Saving animation frames"):
-                pass  # Animation is saved by FuncAnimation, this is just for progress display
             func_animation.save(output_file_name + ".mp4", fps=10)
-            for _ in tqdm(range(len(traj_planner.cmd)), desc="Saving CSV file"):
-                pass  # CSV is saved by pandas, this is just for progress display
             pd.DataFrame(traj_planner.cmd, columns=["theta", "beta"]).to_csv(output_file_name + ".csv")
         else:
             plt.show()
