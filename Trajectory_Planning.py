@@ -216,7 +216,7 @@ class TrajectoryPlanner:
         self.G_td_prev = self.leg["G"].copy()
         # self.v_td = self.L/(self.T) * (self.G_td_prev - self.G_td) / np.linalg.norm(self.G_td_prev - self.G_td)
         # self.v_td = self.V * (self.G_td_prev - self.G_td) / np.linalg.norm(self.G_td_prev - self.G_td)
-        self.v_td = np.array([0,self.V])
+        self.v_td = np.array([0,-self.V/10])
 
         self.generate_swing_trajectory()
         # swing phase
