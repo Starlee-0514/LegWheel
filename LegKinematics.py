@@ -14,6 +14,12 @@ class LegKinematics:
         self.beta0 = np.deg2rad(90)         # beta0  = 90 deg
         # wheel radius 
         self.R = 0.1    # 10 cm
+        
+        # new foot design parameters
+        self.foot_offset = 0.02225  # rim offset for new foot 22.25 mm
+        self.tyre_thickness = 0.01225  # tire thickness 12.25 mm
+        self.foot_radius = self.R + self.foot_offset + self.tyre_thickness  # foot radius 134.5 mm
+        
         # linkage parameters
         self.arc_HF = np.deg2rad(130)   # arc HF
         self.arc_BC = np.deg2rad(101)   # arc BC
@@ -73,13 +79,18 @@ class LegKinematics:
         self.l_BD = abs(self.D_l - self.B_l)
         self.ang_DBC = np.arccos((self.l_BD**2 + self.l3**2 - self.l4**2) / (2 * self.l_BD * self.l3))
         self.C_l = self.B_l + (self.D_l - self.B_l) * np.exp( -1j*(self.ang_DBC) ) * (self.l3 / self.l_BD) # OC = OB + BC
-        self.ang_BCF = np.arccos((self.l3**2 + self.l7**2 - self.l_BF**2) / (2 * self.l3 * self.l7)) 
         self.F_l = self.C_l + (self.B_l - self.C_l) * np.exp( -1j*(self.ang_BCF) ) * (self.l7 / self.l3) # OF = OC + CF
         self.ang_OGF = np.arcsin(abs(self.F_l.imag) / self.l8)
         self.G = self.F_l.real - self.l8 * np.cos(self.ang_OGF) # OG = OF - GF
         self.U_l = self.B_l + (self.C_l - self.B_l) * np.exp( 1j*(self.ang_UBC) ) * (self.R / self.l3)   # OOU = OB + BOU
         self.L_l = self.F_l + (self.G - self.F_l) * np.exp( 1j*(self.ang_LFG) ) * (self.R / self.l8)   # OOL = OF + FOL
         self.H_l = self.U_l + (self.B_l - self.U_l) * np.exp( -1j*(self.theta0) )  # OH = OOU + OUH
+        # foot characteristics points
+        self.O_r = self.G.real + self.R  # rim center
+        self.I_l = self.O_r + (self.R + self.foot_offset) * np.exp( 1j*(np.deg2rad(180-40)) )
+        self.ang_OC = np.angle(self.C_l)
+        self.J_l = self.U_l + (self.R + self.foot_offset) * np.exp( 1j*(np.deg2rad(135)+np.angle(self.H_l - self.U_l)))
+        self.H_extend_l = self.U_l + (self.R + self.foot_offset) * np.exp( 1j*(np.angle(self.H_l - self.U_l)))
         self.symmetry()
         
     # Rotate by beta
@@ -104,6 +115,13 @@ class LegKinematics:
         self.U_r = rot_ang * self.U_r
         self.L_l = rot_ang * self.L_l
         self.L_r = rot_ang * self.L_r
+        self.O_r = rot_ang * self.O_r
+        self.I_l = rot_ang * self.I_l
+        self.I_r = rot_ang * self.I_r
+        self.J_l = rot_ang * self.J_l
+        self.J_r = rot_ang * self.J_r
+        self.H_extend_l = rot_ang * self.H_extend_l
+        self.H_extend_r = rot_ang * self.H_extend_r
 
     # Get right side joints before rotate beta
     def symmetry(self):
@@ -115,6 +133,9 @@ class LegKinematics:
         self.H_r = np.conjugate(self.H_l)
         self.U_r = np.conjugate(self.U_l)
         self.L_r = np.conjugate(self.L_l)
+        self.I_r = np.conjugate(self.I_l)
+        self.J_r = np.conjugate(self.J_l)
+        self.H_extend_r = np.conjugate(self.H_extend_l)
     
     # Convert position expressions from complex numbers to vectors
     def to_vector(self):
@@ -137,6 +158,11 @@ class LegKinematics:
             self.U_r = np.array([self.U_r.real, self.U_r.imag])
             self.L_l = np.array([self.L_l.real, self.L_l.imag])
             self.L_r = np.array([self.L_r.real, self.L_r.imag])
+            self.O_r = np.array([self.O_r.real, self.O_r.imag])
+            self.I_l = np.array([self.I_l.real, self.I_l.imag])
+            self.I_r = np.array([self.I_r.real, self.I_r.imag])
+            self.J_l = np.array([self.J_l.real, self.J_l.imag])
+            self.J_r = np.array([self.J_r.real, self.J_r.imag])
         else:
             self.A_l = np.array([self.A_l.real, self.A_l.imag]).transpose(1, 0)
             self.A_r = np.array([self.A_r.real, self.A_r.imag]).transpose(1, 0)
@@ -156,6 +182,11 @@ class LegKinematics:
             self.U_r = np.array([self.U_r.real, self.U_r.imag]).transpose(1, 0)
             self.L_l = np.array([self.L_l.real, self.L_l.imag]).transpose(1, 0)
             self.L_r = np.array([self.L_r.real, self.L_r.imag]).transpose(1, 0)
+            self.I_l = np.array([self.I_l.real, self.I_l.imag]).transpose(1, 0)
+            self.I_r = np.array([self.I_r.real, self.I_r.imag]).transpose(1, 0)
+            self.O_r = np.array([self.O_r.real, self.O_r.imag]).transpose(1, 0)
+            self.J_l = np.array([self.J_l.real, self.J_l.imag]).transpose(1, 0)
+            self.J_r = np.array([self.J_r.real, self.J_r.imag]).transpose(1, 0)
     
     #### Calculate 4-th linkage length from wheel mode ####
     def calculate_l4(self):
@@ -205,12 +236,18 @@ if __name__ == '__main__':
     U_y_coef = np.polyfit(theta, legwheel.U_l[:, 1], 7)
     L_x_coef = np.polyfit(theta, legwheel.L_l[:, 0], 7)
     L_y_coef = np.polyfit(theta, legwheel.L_l[:, 1], 7)
+    I_x_coef = np.polyfit(theta, legwheel.I_l[:, 0], 7)
+    I_y_coef = np.polyfit(theta, legwheel.I_l[:, 1], 7)
+    J_x_coef = np.polyfit(theta, legwheel.J_l[:, 0], 7)
+    J_y_coef = np.polyfit(theta, legwheel.J_l[:, 1], 7)
+    O_r_dist = np.linalg.norm(legwheel.O_r, axis=1)
     G_dist = np.linalg.norm(legwheel.G  , axis=1)
     U_dist = np.linalg.norm(legwheel.U_l, axis=1)
     L_dist = np.linalg.norm(legwheel.L_l, axis=1)
     inv_G_dist_coef = np.polyfit(G_dist, theta, 7)
     inv_U_dist_coef = np.polyfit(U_dist, theta, 7)
     inv_L_dist_coef = np.polyfit(L_dist, theta, 7)
+    inv_O_r_dist_coef = np.polyfit(O_r_dist, theta, 7)
     end_time = time.time()  # end time
     print("Coefficient Fitting Time:", end_time - start_time, "seconds")
         
@@ -233,6 +270,11 @@ if __name__ == '__main__':
     print(f'U_y_coef = {U_y_coef[::-1].tolist()}')
     print(f'L_x_coef = {L_x_coef[::-1].tolist()}')
     print(f'L_y_coef = {L_y_coef[::-1].tolist()}')
+    print(f'I_x_coef = {I_x_coef[::-1].tolist()}')
+    print(f'I_y_coef = {I_y_coef[::-1].tolist()}')
+    print(f'J_x_coef = {J_x_coef[::-1].tolist()}')
+    print(f'J_y_coef = {J_y_coef[::-1].tolist()}')
     print(f'inv_G_dist_coef = {inv_G_dist_coef[::-1].tolist()}')
     print(f'inv_U_dist_coef = {inv_U_dist_coef[::-1].tolist()}')
     print(f'inv_L_dist_coef = {inv_L_dist_coef[::-1].tolist()}')
+    print(f'inv_O_r_dist_coef = {inv_O_r_dist_coef[::-1].tolist()}')
