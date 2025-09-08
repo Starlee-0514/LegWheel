@@ -59,9 +59,13 @@ class leg_object:
         scale = target_length//len(self.traj_curve)
         if not self.transformed:
             self.transform_generation()
-        self.output_curve = self.transform + self.traj_curve*scale + self.traj_curve[:target_length % len(self.traj_curve)]
+        self.local_Motion = self.traj_curve*scale + self.traj_curve[:target_length % len(self.traj_curve)]
+        self.phase = self.phase*scale + self.phase[:target_length % len(self.traj_curve)]
+        self.output_curve = self.transform + self.local_Motion
         return self.output_curve.copy()
-                
+            
+    
+    
     def get_point_at_time(self, time):
         """
         return [theta, beta] at certain time
@@ -105,7 +109,8 @@ class Gait_Generator:
         self.select_gait()
         self.legs = [leg_object( curve=self.Traj["cmd"],
                                  start_point=(self.gait[i]-1)/len(self.gait),
-                                 inverse= i in [0,3])
+                                 inverse= i in [0,3],
+                                 phase=self.Traj["phase"] )
                                     for i in range(len(self.gait)) ]
         # self.gait_select = "walk"
         
@@ -140,9 +145,13 @@ class Gait_Generator:
     
     def generate_gait(self):
         self.CMDS = [[] for i in range(len(self.legs)*2)]   # generate CMD lists
+        self.phase = pd.DataFrame()   # generate phase lists
         # get cmd list from each legs
         for i, leg in enumerate(self.legs):
             cmd_temp = leg.extend(self.data_len)
+            # series = pd.Series(data= leg.phase , name= f'Leg_{i+1}')
+            self.phase[f'Leg_{i+1}'] = leg.phase
+            # separate theta and beta
             self.CMDS[i*2] = list(map(lambda x: x[0]    , cmd_temp))                                # theta
             self.CMDS[i*2+1] = list(map(lambda x: x[1]  , cmd_temp))   # beta
     
@@ -171,6 +180,10 @@ class Gait_Generator:
         
         df = pd.DataFrame(np.array(self.CMDS ).T)
         df.to_csv(Dir+"CSV/"+self.output_file_name+".csv", index=False, header= False)
+        
+        print("Saving Phase to", Dir+"Phase/"+self.output_file_name+"_Phase.csv")
+        # df_phase = pd.DataFrame(np.array(self.phase).T)
+        self.phase.to_csv(Dir+"Phase/"+self.output_file_name+"_Phase.csv", index=False)
         
     
     def __getitem__(self, key):
@@ -213,17 +226,17 @@ if __name__ == "__main__":
     # func_animation = FuncAnimation(fig, update, frames=len(Traj_Curve)*5, interval=Traj["dt"]*1000, repeat=False)
     func_animation = FuncAnimation(fig, update, frames=frame_len, interval=ani_interval, repeat=False)
 
-    # save_data = True
-    save_data = False
+    save_data = True
+    # save_data = False
 
     # create output file name
     path = "Output_datas/"
     if save_data:
         Gait.save(Dir=path)
         output_file_name = Gait.output_file_name
-        # # saving animation
-        print("Saving animation to", path+'Videos/'+output_file_name+".mp4")
-        func_animation.save(path+'Videos/'+output_file_name + ".mp4", fps=10, writer='ffmpeg')
+        # # # saving animation
+        # print("Saving animation to", path+'Videos/'+output_file_name+".mp4")
+        # func_animation.save(path+'Videos/'+output_file_name + ".mp4", fps=10, writer='ffmpeg')
         
     else:
         plt.show()
