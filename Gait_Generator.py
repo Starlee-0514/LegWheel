@@ -12,20 +12,23 @@ import pandas as pd
 
 # create leg object for planning
 class leg_object:
-    def __init__(self, curve = None, start_point = 0, inverse = False):
+    def __init__(self, curve = None, start_point = 0, inverse = False, phase = []):
         self.leg = PlotLeg.PlotLeg()    # leg object
         self.initial_curve = curve      # initial curve, starts at the touch down point
         self.start_point = start_point  # start point ratio at partial of initial curve
+        self.phase = phase              # phase list [stance=0, swing=1]
         self.traj_curve = curve         # real curve, the actual curve this leg is going
         self.inverse = inverse          # inverse beta value for LHS leg
         if curve != None:
             clip_index = int(len(self.initial_curve)*self.start_point)
-            self.traj_curve = self.initial_curve[clip_index::] + self.initial_curve[:clip_index:]
+            self.traj_curve = self.initial_curve[clip_index::]  + self.initial_curve[:clip_index:]
+            self.phase      = self.phase[clip_index::]          + self.phase[:clip_index:]
             if inverse:
                 self.traj_curve = list(map(lambda x: [x[0], -x[1]], self.traj_curve))
         self.transform = []
         self.transformed = False
         self.output_curve = []
+        self.local_Motion = []
 
     def transform_generation(self):
         """
