@@ -184,7 +184,8 @@ class TrajectoryPlanner:
         return x, y
 
     def move(self):
-        self.cmd = []  # command list [theta, beta]
+        self.cmd = []   # command list [theta, beta]
+        self.phase = [] # phase list [stance=0, swing=1]
         
         # rolling phase planning
         for t in np.arange(0, self.T * (1 - self.duty*(1-self.overlap)), self.dt):
@@ -198,7 +199,10 @@ class TrajectoryPlanner:
                     derivative= lambda beta: -self.H*np.cos(beta) - self.leg["foot_radius"]
                 )
                 beta = solver.solve(self.cmd[-1][1] if len(self.cmd)>1 else self.beta0)
+                if abs(beta) > np.deg2rad(40):
+                    break
                 self.cmd.append([self.solve_theta(beta), beta])
+        self.phase += [0]*len(self.cmd)
         
         # lift off velocity setting
         self.leg.forward(theta=self.cmd[-1][0], beta=self.cmd[-1][1])
@@ -228,11 +232,15 @@ class TrajectoryPlanner:
         
         # transform to command space
         self.swing_points_cmd = list(map(lambda x: [inv_G_dist_poly(x[0]), x[1] + ang_offset] , self.swing_points_polar))  # transform to command space
+        
         self.swing_points_cmd = list(map(lambda x: [x[0] if x[0] <= np.deg2rad(160) else np.deg2rad(160), x[1]] ,
+                                         self.swing_points_cmd))  # transform to command space
+        self.swing_points_cmd = list(map(lambda x: [x[0] if x[0] >= np.deg2rad(17) else np.deg2rad(17), x[1]] ,
                                          self.swing_points_cmd))  # transform to command space
 
 
         self.cmd += self.swing_points_cmd
+        self.phase += [1]*len(self.swing_points_cmd)
 
     # index operator
     def __getitem__(self, key):
@@ -250,7 +258,7 @@ if __name__ == "__main__":
         point = ax.plot(point[0], point[1], marker='o', color=color, markersize=plot_leg.leg_shape.mark_size, zorder=plot_leg.leg_shape.zorder+0.00001)[0]
         return point
     animate = True
-    save_data = False
+    save_data = True
     import time
     if animate:
         from matplotlib.animation import FuncAnimation
@@ -298,8 +306,8 @@ if __name__ == "__main__":
             # OO_r_Dist = H/np.cos(beta)          # update OO_r_Dist
             # theta=inv_G_dist_poly(OO_r_Dist+leg["R"])    # update theta
             theta, beta = traj_planner.cmd[frame]   # update theta and beta from command list
-            # hip_movement = H*(np.sin(beta0)-np.sin(beta))+leg.foot_radius*( beta0-beta )            # calculate hip_movement
-            hip_movement = traj_planner.V*t
+            hip_movement = traj_planner.H*(np.sin(beta0)-np.sin(beta))+leg.foot_radius*( beta0-beta )            # calculate hip_movement
+            # hip_movement = traj_planner.V*t
             # hip_movement = 0
             ground_contact_point =  plot_leg.rim_point(np.rad2deg(-beta))+np.array([hip_movement,0])
             leg.forward(theta, beta)
@@ -316,7 +324,7 @@ if __name__ == "__main__":
 
         # plot_point(ax, plot_leg.rim_point(np.rad2deg(-beta0)), color='red', plot_leg=plot_leg)
         # plot_leg.plot_by_angle(theta0, beta0, O=np.array([D*3,0]), ax=ax)
-        func_animation = FuncAnimation(fig, update, frames=len(traj_planner.cmd), interval=50)
+        func_animation = FuncAnimation(fig, update, frames=int(len(traj_planner.cmd)), interval=50)
         if save_data:
             # plt.show()
             # Save the animation as a video file
