@@ -108,7 +108,7 @@ class LegModel:
             self.O_r = self.G.real + self.R  # rim center
             self.I_l = self.O_r + (self.R + self.foot_offset) * np.exp( 1j*(np.deg2rad(180-40)) )
             self.ang_OC = np.angle(self.C_l)
-            self.J_l = self.U_l + (self.R + self.foot_offset) * np.exp( 1j*(np.deg2rad(135)+np.angle(self.H_l - self.U_l)))
+            self.J_l = self.U_l + (self.R + self.foot_offset) * np.exp( 1j*(np.deg2rad(140)+np.angle(self.H_l - self.U_l)))
             self.H_extend_l = self.U_l + (self.R + self.foot_offset) * np.exp( 1j*(np.angle(self.H_l - self.U_l)))
 
         else:
@@ -195,6 +195,8 @@ class LegModel:
             self.I_r = np.array([self.I_r.real, self.I_r.imag])
             self.J_l = np.array([self.J_l.real, self.J_l.imag])
             self.J_r = np.array([self.J_r.real, self.J_r.imag])
+            self.H_extend_l = np.array([self.H_extend_l.real, self.H_extend_l.imag])
+            self.H_extend_r = np.array([self.H_extend_r.real, self.H_extend_r.imag])
         else:
             self.A_l = np.array([self.A_l.real, self.A_l.imag]).transpose(1, 0)
             self.A_r = np.array([self.A_r.real, self.A_r.imag]).transpose(1, 0)
@@ -219,6 +221,8 @@ class LegModel:
             self.O_r = np.array([self.O_r.real, self.O_r.imag]).transpose(1, 0)
             self.J_l = np.array([self.J_l.real, self.J_l.imag]).transpose(1, 0)
             self.J_r = np.array([self.J_r.real, self.J_r.imag]).transpose(1, 0)
+            self.H_extend_l = np.array([self.H_extend_l.real, self.H_extend_l.imag]).transpose(1, 0)
+            self.H_extend_r = np.array([self.H_extend_r.real, self.H_extend_r.imag]).transpose(1, 0)
 
     #### Contact map ####
     # Not consider the situation where there is no normal contact.
@@ -465,6 +469,7 @@ class LegModel:
         Returns:
             np.ndarray: The 2D rotation matrix.
         """
+        ang = np.float64(ang)
         rot_matrix = np.array([[np.cos(ang), -np.sin(ang)],
                                 [np.sin(ang),  np.cos(ang)]])
         return rot_matrix
@@ -485,11 +490,12 @@ class LegModel:
         """
         # calculate in vector forms
         self.forward(self.theta, self.beta, vector=True)
-
-        # check if alpha in range and turn it into the range [-180, 180]
-        if alpha < -180 or alpha > 180:
-            alpha = ((alpha + 180) % 360) - 180
-        if self.n_elements == 0:
+        alpha = np.array(alpha)
+        n_elements = 0 if alpha.ndim == 0 else alpha.shape[0]  # amount of theta given in an array, 0: single value.
+        if n_elements == 0 and self.n_elements == 0:
+            # check if alpha in range and turn it into the range [-180, 180]
+            if alpha < -180 or alpha > 180:
+                alpha = ((alpha + 180) % 360) - 180
             if -40 <= alpha <= 40:
                 # Foot rim
                 # P(alpha) = O_r + (R+foot_offset)*rot(alpha)*norm(O_r -> G)
@@ -504,7 +510,8 @@ class LegModel:
                 rim_point = self.U_l + (self.R+self.foot_offset+self.tyre_thickness)*(self.rot(np.deg2rad(alpha+40))@(self.J_l-self.U_l))/np.linalg.norm(self.J_l-self.U_l)
             else:
                 raise ValueError("Invalid alpha angle.")
-        else:
+            return rim_point
+        elif n_elements == 0:
             if -40 <= alpha <= 40:
                 # Foot rim
                 # P(alpha) = O_r + (R+foot_offset)*rot(alpha)*norm(O_r -> G)
@@ -519,8 +526,36 @@ class LegModel:
                 rim_point = self.U_l + (self.R+self.foot_offset+self.tyre_thickness)*   (self.rot(np.deg2rad(alpha+40))@(self.J_l-self.U_l).T  ).T/ np.linalg.norm(self.J_l-self.U_l)
             else:
                 raise ValueError("Invalid alpha angle.")
+            return rim_point
+        else:
+            # check if alpha in range and turn it into the range [-180, 180]
+            alpha = np.asarray(alpha)
+            alpha_mod = ((alpha + 180) % 360) - 180
+            
+            # Create masks for each region
+            mask_foot = (-40 <= alpha_mod) & (alpha_mod <= 40)
+            mask_upper_rhs = (40 < alpha_mod) & (alpha_mod <= 180)
+            mask_upper_lhs = (-180 <= alpha_mod) & (alpha_mod < -40)
+            
+            # Prepare output array
+            rim_points = np.zeros((alpha_mod.size, 2))  # or appropriate shape
 
-        return rim_point
+            # Assign for foot rim
+            indices_foot = np.where(mask_foot)[0]
+            if indices_foot.size > 0:
+                rim_points[indices_foot] = np.array([self.rim_point(a) for a in alpha_mod[mask_foot]])
+
+            # Assign for upper rim RHS
+            indices_rhs = np.where(mask_upper_rhs)[0]
+            if indices_rhs.size > 0:
+                rim_points[indices_rhs] = np.array([self.rim_point(a) for a in alpha_mod[mask_upper_rhs]])
+
+            # Assign for upper rim LHS
+            indices_lhs = np.where(mask_upper_lhs)[0]
+            if indices_lhs.size > 0:
+                rim_points[indices_lhs] = np.array([self.rim_point(a) for a in alpha_mod[mask_upper_lhs]])
+
+            return rim_points
 
     def __getitem__(self, key):
         """
