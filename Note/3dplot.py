@@ -4,7 +4,7 @@ import sys
 sys.path.append('C:\\Users\\starl\\NTU\\Birola_LAB\\Code\\LegWheel')
 import LegModel
 import PlotLeg
-from mpl_toolkits.mplot3d import Axes3D
+# from mpl_toolkits.mplot3d import Axes3D
 
 T = np.array([np.deg2rad(i) for i in range(17,160)])
 B = np.array([i*0 for i in range(17,160)])

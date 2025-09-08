@@ -28,6 +28,7 @@ fig, ax = plt.subplots()
 #     ax.grid()
 #     ax.set_title(f'Theta: {frame}°')
 # ani = FuncAnimation(fig, update, frames=range(17, 161, 5), interval=100)
+# ani.save(filename='./Output_datas/leg_extend.mp4', fps=10, writer='ffmpeg')
 
 # plot rim point at leg
 def update(frame, theta=100):
@@ -38,6 +39,6 @@ def update(frame, theta=100):
     ax.grid()
     ax.set_title(f'Theta: {theta}°, Alpha: {frame}°')
 ani = FuncAnimation(fig, update, frames=range(-180, 180, 3), interval=1)
-
+ani.save(filename='./Output_datas/leg_rim_point.mp4', fps=10, writer='ffmpeg')
 
 plt.show()

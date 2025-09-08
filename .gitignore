@@ -3,3 +3,7 @@ __pycache__/
 venv
 *.mp4
 Output_datas
+*.svg
+*.jpg
+*.png
+*.csv
